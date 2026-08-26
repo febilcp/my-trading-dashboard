@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlueComp Trading Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a1a;
+            overflow-x: hidden;
+        }
+        .top-bar {
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 14px;
+        }
+        .demo-btn {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+        }
+        .main-panel {
+            background: #fff;
+            margin: 16px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+        }
+        .controls-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .instrument-select {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .gold-badge {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .search-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #64748b;
+            min-width: 180px;
+        }
+        .timeframes {
+            display: flex;
+            gap: 4px;
+        }
+        .tf-btn {
+            padding: 6px 12px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tf-btn.active {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+        .tf-btn:hover:not(.active) {
+            background: #f1f5f9;
+        }
+        .indicators-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .ind-btn {
+            padding: 8px 16px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .ind-btn.active {
+            background: #1e40af;
+            color: #fff;
+            border-color: #1e40af;
+        }
+        .ind-btn:hover:not(.active) {
+            background: #f8fafc;
+        }
+        .hint-text {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-bottom: 16px;
+        }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+        }
+        .chart-header .ohlc {
+            display: flex;
+            gap: 12px;
+        }
+        .chart-header .ohlc span {
+            color: #64748b;
+        }
+        .chart-header .ohlc .red { color: #dc2626; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 520px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #chartCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .toolbar-left {
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(255,255,255,0.9);
+            padding: 4px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .tool-btn {
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            border: none; background: transparent;
+            cursor: pointer; border-radius: 4px;
+            color: #64748b; font-size: 14px;
+        }
+        .tool-btn:hover { background: #f1f5f9; }
+        .price-labels {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 40px;
+            width: 60px;
+            background: rgba(255,255,255,0.95);
+            border-left: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            text-align: right;
+        }
+        .current-price {
+            position: absolute;
+            right: 0;
+            bottom: 40px;
+            background: #dc2626;
+            color: #fff;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 4px 0 0 4px;
+        }
+        .ema-label {
+            position: absolute;
+            right: 60px;
+            bottom: 100px;
+            background: #2563eb;
+            color: #fff;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 4px;
+        }
+        .sell-box {
+            position: absolute;
+            background: rgba(220, 38, 38, 0.85);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.5;
+            box-shadow: 0 4px 12px rgba(220,38,38,0.3);
+            pointer-events: none;
+            min-width: 110px;
+        }
+        .sell-box strong {
+            font-size: 13px;
+            display: block;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+        .ob-zone {
+            position: absolute;
+            left: 60px;
+            right: 60px;
+            background: rgba(220, 38, 38, 0.08);
+            border-top: 1px solid rgba(220,38,38,0.3);
+            border-bottom: 1px solid rgba(220,38,38,0.3);
+            pointer-events: none;
+        }
+        .ob-label {
+            position: absolute;
+            left: 65px;
+            font-size: 10px;
+            color: #dc2626;
+            font-weight: 700;
+            background: rgba(255,255,255,0.8);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        .volume-profile {
+            position: absolute;
+            right: 60px;
+            top: 8px;
+            bottom: 40px;
+            width: 80px;
+            pointer-events: none;
+        }
+        .time-axis {
+            position: absolute;
+            bottom: 0;
+            left: 60px;
+            right: 60px;
+            height: 40px;
+            background: #fff;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="top-bar">
+        <div class="logo-section">
+            <div class="logo-icon">B</div>
+            <div>
+                <div style="font-size:14px;font-weight:700;color:#1e293b;">blue-comp.com</div>
+            </div>
+        </div>
+        <button class="demo-btn">▶ AI DEMO / COPY TRADE</button>
+    </div>
+
+    <div class="main-panel">
+        <div class="controls-row">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="font-size:11px;color:#94a3b8;font-weight:600;">Instrument</div>
+                <div class="instrument-select">
+                    <span style="font-weight:700;">XAU/USD</span>
+                    <span class="gold-badge">Gold</span>
+                    <span style="color:#94a3b8;">▼</span>
+                </div>
+                <div style="font-size:11px;color:#94a3b8;">Tap XAU/USD to view more products</div>
+            </div>
+            <div class="search-box">🔍 Search product or symbol</div>
+            <div class="timeframes">
+                <button class="tf-btn">1m</button>
+                <button class="tf-btn">3m</button>
+                <button class="tf-btn active">5m</button>
+                <button class="tf-btn">15m</button>
+                <button class="tf-btn">30m</button>
+                <button class="tf-btn">1H</button>
+                <button class="tf-btn">2H</button>
+                <button class="tf-btn">4H</button>
+                <button class="tf-btn">1D</button>
+                <button class="tf-btn">1W</button>
+            </div>
+        </div>
+
+        <div class="indicators-row">
+            <button class="ind-btn active">🔮 Analyst team chart analysis</button>
+            <button class="ind-btn active">EMA ▼ 1 ▼</button>
+            <button class="ind-btn">MACD + RSI ▼</button>
+            <button class="ind-btn">BOLL</button>
+            <button class="ind-btn active">Volume Profile S/R</button>
+            <button class="ind-btn">Structure</button>
+            <button class="ind-btn">Smart Money</button>
+            <button class="ind-btn">FVG</button>
+            <button class="ind-btn active">Order Block</button>
+            <button class="ind-btn active">Scalping</button>
+            <button class="ind-btn">Trend Line</button>
+            <button class="ind-btn">Auto Fib</button>
+            <button class="ind-btn">Sessions</button>
+        </div>
+        <div class="hint-text">Tap an indicator name to load it; tap again to remove it</div>
+
+        <div class="chart-header">
+            <div class="ohlc">
+                <span>O <strong>4609.155</strong></span>
+                <span>H <strong>4610.425</strong></span>
+                <span>L <strong>4605.310</strong></span>
+                <span>C <strong>4608.225</strong></span>
+                <span class="red">▼ -0.02%</span>
+                <span>Volume <strong>3.235</strong></span>
+            </div>
+        </div>
+
+        <div class="chart-container" id="chartContainer">
+            <canvas id="chartCanvas"></canvas>
+
+            <div class="toolbar-left">
+                <button class="tool-btn">✛</button>
+                <button class="tool-btn">━</button>
+                <button class="tool-btn">╱</button>
+                <button class="tool-btn">┃</button>
+                <button class="tool-btn">T</button>
+                <button class="tool-btn">✎</button>
+            </div>
+
+            <div class="price-labels" id="priceLabels"></div>
+            <div class="current-price">4608.225<br><span style="font-size:10px;opacity:0.8;">01:26</span></div>
+            <div class="ema-label">EMA 20</div>
+
+            <!-- Order Block Zones -->
+            <div class="ob-zone" style="top:12%;height:14%;"></div>
+            <div class="ob-label" style="top:12%;">Bearish OB</div>
+
+            <div class="ob-zone" style="top:38%;height:10%;"></div>
+            <div class="ob-label" style="top:38%;">Bearish OB</div>
+
+            <!-- SELL Boxes -->
+            <div class="sell-box" style="left:15%;top:28%;">
+                <strong>SELL</strong>
+                Entry: 4641.66<br>
+                TP: 4637.02<br>
+                SL: 4646.30
+            </div>
+            <div class="sell-box" style="left:22%;top:38%;">
+                <strong>SELL</strong>
+                Entry: 4634.06<br>
+                TP: 4629.43<br>
+                SL: 4638.70
+            </div>
+            <div class="sell-box" style="left:40%;top:50%;">
+                <strong>SELL</strong>
+                Entry: 4616.98<br>
+                TP: 4612.36<br>
+                SL: 4621.59
+            </div>
+            <div class="sell-box" style="left:45%;top:44%;">
+                <strong>SELL</strong>
+                Entry: 4623.49<br>
+                TP: 4618.87<br>
+                SL: 4628.12
+            </div>
+
+            <div class="volume-profile" id="volumeProfile"></div>
+
+            <div class="time-axis">
+                <span>01:00</span>
+                <span>01:05</span>
+                <span>01:10</span>
+                <span>01:15</span>
+                <span>01:20</span>
+                <span>01:25</span>
+                <span>01:30</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('chartCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('chartContainer');
+
+        function resize() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            drawChart();
+        }
+        window.addEventListener('resize', resize);
+
+        // Generate realistic Gold (XAU/USD) downtrend data
+        function generateData() {
+            const data = [];
+            let price = 4675;
+            const now = new Date();
+            for (let i = 0; i < 80; i++) {
+                const trend = -0.8; // downtrend
+                const noise = (Math.random() - 0.5) * 3;
+                const open = price;
+                const close = price + trend + noise;
+                const high = Math.max(open, close) + Math.random() * 2;
+                const low = Math.min(open, close) - Math.random() * 2;
+                const volume = 0.5 + Math.random() * 4;
+                data.push({ open, high, low, close, volume, time: new Date(now.getTime() - (80-i)*5*60000) });
+                price = close;
+            }
+            return data;
+        }
+
+        const data = generateData();
+        const minPrice = Math.min(...data.map(d => d.low)) - 2;
+        const maxPrice = Math.max(...data.map(d => d.high)) + 2;
+        const priceRange = maxPrice - minPrice;
+
+        // EMA 20
+        function calcEMA(data, period) {
+            const k = 2 / (period + 1);
+            const ema = [data[0].close];
+            for (let i = 1; i < data.length; i++) {
+                ema.push(data[i].close * k + ema[i-1] * (1-k));
+            }
+            return ema;
+        }
+        const ema20 = calcEMA(data, 20);
+
+        function priceToY(p) {
+            const padTop = 20, padBottom = 40;
+            return padTop + (1 - (p - minPrice) / priceRange) * (canvas.height - padTop - padBottom);
+        }
+
+        function drawChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const leftPad = 60, rightPad = 140;
+            const chartW = canvas.width - leftPad - rightPad;
+            const candleW = chartW / data.length * 0.7;
+            const spacing = chartW / data.length;
+
+            // Grid lines
+            ctx.strokeStyle = '#f1f5f9';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 8; i++) {
+                const y = 20 + (i / 8) * (canvas.height - 60);
+                ctx.beginPath();
+                ctx.moveTo(leftPad, y);
+                ctx.lineTo(canvas.width - rightPad, y);
+                ctx.stroke();
+            }
+
+            // Horizontal dashed line at current price
+            const currentY = priceToY(4608.225);
+            ctx.strokeStyle = '#dc2626';
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(leftPad, currentY);
+            ctx.lineTo(canvas.width - rightPad, currentY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Candlesticks
+            data.forEach((d, i) => {
+                const x = leftPad + i * spacing + spacing/2;
+                const yOpen = priceToY(d.open);
+                const yClose = priceToY(d.close);
+                const yHigh = priceToY(d.high);
+                const yLow = priceToY(d.low);
+                const isRed = d.close < d.open;
+
+                ctx.fillStyle = isRed ? '#dc2626' : '#16a34a';
+                ctx.strokeStyle = isRed ? '#dc2626' : '#16a34a';
+
+                // Wick
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x, yHigh);
+                ctx.lineTo(x, yLow);
+                ctx.stroke();
+
+                // Body
+                const bodyH = Math.max(1, Math.abs(yClose - yOpen));
+                const bodyY = Math.min(yOpen, yClose);
+                ctx.fillRect(x - candleW/2, bodyY, candleW, bodyH);
+            });
+
+            // EMA Line
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            data.forEach((d, i) => {
+                const x = leftPad + i * spacing + spacing/2;
+                const y = priceToY(ema20[i]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Volume profile bars on right
+            const volProfileX = canvas.width - rightPad + 10;
+            const volProfileW = rightPad - 70;
+            const rows = 40;
+            const rowH = (canvas.height - 60) / rows;
+
+            for (let r = 0; r < rows; r++) {
+                const rowPrice = maxPrice - (r / rows) * priceRange;
+                const rowPriceNext = maxPrice - ((r+1) / rows) * priceRange;
+                let vol = 0;
+                data.forEach(d => {
+                    if (d.high >= rowPriceNext && d.low <= rowPrice) {
+                        vol += d.volume * (0.3 + Math.random() * 0.7);
+                    }
+                });
+                const maxVol = 15;
+                const barW = (vol / maxVol) * volProfileW;
+                const alpha = 0.3 + (vol / maxVol) * 0.7;
+                ctx.fillStyle = `rgba(220, 38, 38, ${alpha})`;
+                ctx.fillRect(volProfileX, 20 + r * rowH, barW, rowH - 1);
+            }
+
+            // Price labels
+            const labelContainer = document.getElementById('priceLabels');
+            labelContainer.innerHTML = '';
+            const steps = 10;
+            for (let i = 0; i <= steps; i++) {
+                const p = minPrice + (i / steps) * priceRange;
+                const div = document.createElement('div');
+                div.textContent = p.toFixed(3);
+                labelContainer.appendChild(div);
+            }
+        }
+
+        // Interactive timeframe buttons
+        document.querySelectorAll('.tf-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Interactive indicator buttons
+        document.querySelectorAll('.ind-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.classList.toggle('active');
+            });
+        });
+
+        resize();
+    </script>
+</body>
+</html>
