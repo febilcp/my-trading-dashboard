@@ -138,6 +138,7 @@ aside h3:first-child{margin-top:0}
   <button class="ind" data-k="fib">Auto Fib</button>
   <button class="ind" data-k="sessions">Sessions</button>
   <button class="ind active" data-k="sig">Signals</button>
+  <button class="key-btn" id="soundBtn" style="margin-left:0">🔔 Alerts: ON</button>
 </div>
 <div class="hint" id="hintBar">Tap indicator to toggle. XAU/USD spot — live via TwelveData.</div>
 <div class="main">
@@ -177,8 +178,39 @@ let S={
   signals:[],scalpSignals:[],obZones:[],fvgZones:[],
   swings:[],structLabels:[],zigzag:[],trendlines:[],fibLevels:null,
   liquidity:[],pdRange:null,pollTimer:null,
-  candleCloseMs:0, tfSeconds:300
+  candleCloseMs:0, tfSeconds:300,
+  soundOn: (localStorage.getItem('sound_alerts')!=='off'),
+  lastSeenSignalTime: 0
 };
+
+// ================= SOUND ALERT =================
+// Two-tone bell via WebAudio (no external mp3 needed, works offline once loaded)
+let audioCtx=null;
+function playBell(isBuy){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    const freqs = isBuy ? [880, 1318.5] : [660, 440]; // rising chime for BUY, falling for SELL
+    freqs.forEach((f,i)=>{
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type='sine'; osc.frequency.value=f;
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      const t0 = now + i*0.14;
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(0.25, t0+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0+0.5);
+      osc.start(t0); osc.stop(t0+0.55);
+    });
+  }catch(e){ /* audio blocked until first user interaction — harmless */ }
+}
+document.getElementById('soundBtn').onclick=()=>{
+  S.soundOn = !S.soundOn;
+  localStorage.setItem('sound_alerts', S.soundOn ? 'on':'off');
+  document.getElementById('soundBtn').textContent = S.soundOn ? '🔔 Alerts: ON' : '🔕 Alerts: OFF';
+  if(S.soundOn) playBell(true); // quick confirmation chime
+};
+document.getElementById('soundBtn').textContent = S.soundOn ? '🔔 Alerts: ON' : '🔕 Alerts: OFF';
 
 // ================= TIMESTAMP HELPERS =================
 // TwelveData returns "YYYY-MM-DD HH:MM:SS" with NO timezone marker.
@@ -430,6 +462,24 @@ function render(){
   markers.sort((a,b)=>a.time-b.time);
   candleSeries.setMarkers(markers);
   renderSignalPanel(act);updateOHLC(c[c.length-1]);
+  checkNewSignalAlert(act);
+}
+
+// Fires the bell only for a genuinely new signal (freshly formed on the most
+// recent 1-2 candles), never on page load / timeframe switch / historical
+// signals already in the dataset — otherwise every reload would ring the bell
+// for the last 6-8 old signals at once.
+function checkNewSignalAlert(sigs){
+  if(!sigs.length) return;
+  const newest = sigs[sigs.length-1];
+  const isFreshEnough = (S.candles.length - 1 - newest.idx) <= 1; // fired on latest or prior candle only
+  if(newest.time > S.lastSeenSignalTime){
+    const firstLoad = S.lastSeenSignalTime === 0;
+    S.lastSeenSignalTime = newest.time;
+    if(!firstLoad && isFreshEnough && S.soundOn){
+      playBell(newest.side==='BUY');
+    }
+  }
 }
 
 function renderSignalPanel(sigs){
