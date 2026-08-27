@@ -514,37 +514,72 @@ function drawOverlay(){
   if(S.trend)for(const t of S.trendlines){const x1=px(t.a.time),y1=py(t.a.price),x2=px(t.b.time),y2=py(t.b.price);if(x1==null||x2==null||y1==null||y2==null||x2===x1)continue;const slope=(y2-y1)/(x2-x1),yE=y2+slope*(RE-x2);octx.strokeStyle=t.color;octx.lineWidth=1.5;octx.beginPath();octx.moveTo(x1,y1);octx.lineTo(RE,yE);octx.stroke();octx.lineWidth=1;}
   if(S.vp){const lows=c.map(b=>b.low),highs=c.map(b=>b.high),pMin=Math.min(...lows),pMax=Math.max(...highs),bins=40,binSize=(pMax-pMin)/bins||1,hasVol=c.some(b=>b.volume>0),vol=new Array(bins).fill(0);for(const b of c)vol[Math.min(bins-1,Math.floor((b.close-pMin)/binSize))]+=(hasVol?b.volume:1);const maxV=Math.max(...vol),maxW=W*0.16,cur=c[c.length-1].close;for(let i=0;i<bins;i++){const price=pMin+(i+0.5)*binSize,y=py(price);if(y==null)continue;const w=(vol[i]/maxV)*maxW;octx.fillStyle=price>cur?'rgba(238,75,95,.3)':'rgba(31,201,138,.3)';octx.fillRect(RE-w,y-3,w,6);}}
 
+  // SIGNAL BOARDS — compact, pinned tight to the exact candle that fired
+  // them, with a solid pointer arrow instead of a thin line, so at a glance
+  // you can tell which candle each BUY/SELL belongs to even when several
+  // signals sit close together.
   if(S.sig){
-    const act=activeSigs().slice(-4),BW=140,BH=80,PAD=8,placed=[];
+    const act=activeSigs().slice(-4);
+    const BW=108,BH=58,GAP=10,ARROW=7,PAD=7,placed=[];
     for(const s of act){
       const x=px(s.time),yEntry=py(s.entry);
       if(x==null||yEntry==null)continue;
-      let bx=Math.min(Math.max(x-BW/2,4),RE-BW-4);
-      let by=s.side==='SELL'?yEntry-BH-18:yEntry+18;
-      by=Math.min(Math.max(by,4),H-BH-4);
-      for(const p of placed){if(Math.abs(bx-p.x)<BW+4&&Math.abs(by-p.y)<BH+4){by=p.y+(s.side==='SELL'?-(BH+6):(BH+6));by=Math.min(Math.max(by,4),H-BH-4);}}
-      placed.push({x:bx,y:by});
       const col=s.side==='SELL'?'#ee4b5f':'#1fc98a';
       const tp1Hit=s.status==='TP1'||s.status==='TP2',tp2Hit=s.status==='TP2',slHit=s.status==='SL';
-      rr(bx,by,BW,BH,7);octx.fillStyle='rgba(11,14,20,.93)';octx.fill();octx.strokeStyle=col;octx.lineWidth=1.5;octx.stroke();octx.lineWidth=1;
-      rr(bx,by,BW,18,7);octx.save();octx.clip();octx.fillStyle=col;octx.fillRect(bx,by,BW,18);octx.restore();
-      octx.fillStyle='#0b0e14';octx.font='bold 11px Inter';octx.fillText((s.scalp?'S·':'')+s.side,bx+PAD,by+13);
-      const ago=fmtAgo(s.time).replace(' ago','');octx.font='9px IBM Plex Mono';octx.fillText(ago,bx+BW-PAD-octx.measureText(ago).width,by+13);
-      octx.font='10px IBM Plex Mono';
-      octx.fillStyle='#dce3f0';octx.fillText(`E   ${fmt(s.entry)}`,bx+PAD,by+32);
-      octx.fillStyle=tp1Hit?'#7d8aa5':'#1fc98a';octx.fillText(`TP1 ${fmt(s.tp1)}${tp1Hit?' ✓':''}`,bx+PAD,by+44);
-      octx.fillStyle=tp2Hit?'#7d8aa5':'#6ee7b7';octx.fillText(`TP2 ${fmt(s.tp2)}${tp2Hit?' ✓✓':''}`,bx+PAD,by+56);
-      octx.fillStyle='#ee4b5f';octx.fillText(`SL  ${fmt(s.sl)}${slHit?' ✗':''}`,bx+PAD,by+68);
-      const stCol=s.status==='ACTIVE'?'#e8b84b':s.status==='SL'?'#ee4b5f':'#1fc98a';
-      const stTxt=s.status==='ACTIVE'?'● ACTIVE':s.status==='TP1'?'✓ TP1':s.status==='TP2'?'✓✓ TP2':'✗ SL';
-      octx.fillStyle=stCol;octx.font='bold 9px Inter';octx.fillText(stTxt,bx+PAD,by+79);
-      octx.setLineDash([2,3]);
-      const yTp1=py(s.tp1),yTp2=py(s.tp2),ySl=py(s.sl);
-      if(yTp1!=null){octx.strokeStyle=tp1Hit?'rgba(31,201,138,.3)':'rgba(31,201,138,.5)';octx.beginPath();octx.moveTo(x,yTp1);octx.lineTo(x+40,yTp1);octx.stroke();}
-      if(yTp2!=null){octx.strokeStyle=tp2Hit?'rgba(110,231,183,.3)':'rgba(110,231,183,.5)';octx.beginPath();octx.moveTo(x,yTp2);octx.lineTo(x+40,yTp2);octx.stroke();}
-      if(ySl!=null){octx.strokeStyle='rgba(238,75,95,.5)';octx.beginPath();octx.moveTo(x,ySl);octx.lineTo(x+40,ySl);octx.stroke();}
-      octx.setLineDash([]);
-      octx.strokeStyle=col;octx.setLineDash([2,2]);octx.beginPath();octx.moveTo(x,s.side==='SELL'?by+BH:by);octx.lineTo(x,yEntry);octx.stroke();octx.setLineDash([]);
+
+      // anchor point = the exact high (SELL) or low (BUY) of the signal candle
+      const candle=c[s.idx];
+      const anchorPrice = s.side==='SELL' ? candle.high : candle.low;
+      const yAnchor = py(anchorPrice) ?? yEntry;
+
+      // box sits GAP px above (SELL) / below (BUY) the candle's own high/low —
+      // close enough that the arrow is short and unambiguous
+      let bx = x - BW/2;
+      let by = s.side==='SELL' ? yAnchor - GAP - ARROW - BH : yAnchor + GAP + ARROW;
+      bx = Math.min(Math.max(bx,4), RE-BW-4);
+      by = Math.min(Math.max(by,4), H-BH-4);
+
+      // if this box would overlap a previously placed one, shift sideways
+      // (not far away vertically) so it still reads as belonging to its own candle
+      for(const p of placed){
+        if(Math.abs(bx-p.x)<BW-6 && Math.abs(by-p.y)<BH-6){
+          bx = bx + (x>=W/2 ? -(BW-4) : (BW-4));
+          bx = Math.min(Math.max(bx,4), RE-BW-4);
+        }
+      }
+      placed.push({x:bx,y:by});
+
+      // solid pointer arrow from box to the exact candle wick tip
+      const arrowTipY = s.side==='SELL' ? yAnchor - GAP : yAnchor + GAP;
+      const arrowBaseY = s.side==='SELL' ? by+BH : by;
+      octx.fillStyle = col;
+      octx.beginPath();
+      octx.moveTo(x, arrowTipY);
+      octx.lineTo(x-ARROW, arrowTipY + (s.side==='SELL'?ARROW:-ARROW));
+      octx.lineTo(x+ARROW, arrowTipY + (s.side==='SELL'?ARROW:-ARROW));
+      octx.closePath(); octx.fill();
+      // thin solid shaft connecting arrow base to box edge (only if there's a gap)
+      if(Math.abs(arrowBaseY-arrowTipY)>ARROW+1){
+        octx.strokeStyle=col; octx.lineWidth=1.5;
+        octx.beginPath(); octx.moveTo(x, arrowBaseY); octx.lineTo(x, arrowTipY + (s.side==='SELL'?ARROW:-ARROW)); octx.stroke();
+        octx.lineWidth=1;
+      }
+
+      // box background + border
+      rr(bx,by,BW,BH,6); octx.fillStyle='rgba(11,14,20,.95)'; octx.fill();
+      octx.strokeStyle=col; octx.lineWidth=1.4; octx.stroke(); octx.lineWidth=1;
+      // header strip
+      rr(bx,by,BW,15,6); octx.save(); octx.clip(); octx.fillStyle=col; octx.fillRect(bx,by,BW,15); octx.restore();
+      octx.fillStyle='#0b0e14'; octx.font='bold 10px Inter';
+      octx.fillText((s.scalp?'S·':'')+s.side, bx+PAD, by+11);
+      const stTxt=s.status==='ACTIVE'?'●':s.status==='TP1'?'✓':s.status==='TP2'?'✓✓':'✗';
+      octx.font='bold 10px Inter';
+      octx.fillText(stTxt, bx+BW-PAD-octx.measureText(stTxt).width, by+11);
+      // compact body: E / TP1 / SL only (TP2 shown via ✓✓ once hit, keeps box small)
+      octx.font='9px IBM Plex Mono';
+      octx.fillStyle='#dce3f0'; octx.fillText(`E  ${fmt(s.entry)}`, bx+PAD, by+27);
+      octx.fillStyle=tp1Hit?'#6b7d93':'#1fc98a'; octx.fillText(`T1 ${fmt(s.tp1)}${tp1Hit?' ✓':''}`, bx+PAD, by+39);
+      octx.fillStyle=slHit?'#ee4b5f':'#c85a68'; octx.fillText(`SL ${fmt(s.sl)}${slHit?' ✗':''}`, bx+PAD, by+51);
     }
   }
 }
